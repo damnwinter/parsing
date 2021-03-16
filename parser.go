@@ -1,11 +1,13 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"github.com/gocolly/colly"
 	"io/ioutil"
 	"math/rand"
 	"net/http"
+	"regexp"
 	"time"
 )
 
@@ -13,7 +15,6 @@ var UserAgents = []string{
 	"Mozilla/5.0 (Windows NT 10.0; WOW64; rv:56.0) Gecko/20100101 Firefox/56.0",
 	"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/61.0.3163.100 Safari/537.36 OPR/48.0.2685.52",
 	"Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/62.0.3202.9 Safari/537.36",
-	"Mozilla/5.0 (Windows NT 10.0; WOW64; Trident/7.0; rv:11.0) like Gecko"
 }
 
 func GetRandom(data []string) (string, error) {
@@ -26,7 +27,8 @@ func GetRandom(data []string) (string, error) {
 
 
 func main() {
-	_ = "https://torgi.gov.ru/lotSearch1.html?bidKindId=8"
+	baseUrl := "https://torgi.gov.ru/lotSearch1.html"
+	searchType := "?bidKindId=8"
 
 	userAgent, err := GetRandom(UserAgents)
 	if err != nil {
@@ -38,11 +40,11 @@ func main() {
 	//collyParse(url, userAgent)
 
 
-	req, err := http.Get("https://torgi.gov.ru/?wicket:interface=:0:search_panel:resultTable:list:bottomToolbars:2:toolbar:span:navigator:navigation:9:pageLink::ILinkListener::")
-	cont, _ := ioutil.ReadAll(req.Body)
-	fmt.Println(string(cont))
 
-
+	_, err = httpParse(baseUrl, searchType, userAgent)
+	if err != nil {
+		fmt.Println(err)
+	}
 
 	return
 }
@@ -56,10 +58,6 @@ func main() {
 // common:locationKladrCommon:
 // common:kladrIdStr:
 // search_panel:buttonsPanel:search: 1
-
-//?wicket:interface=:2:search_panel:resultTable:list:bottomToolbars:2:toolbar:span:navigator:navigation:1:pageLink::ILinkListener::" id="id162" onclick="showBusysign();var wcall=wicketAjaxGet('?wicket:interface=:2:search_panel:resultTable:list:bottomToolbars:2:toolbar:span:navigator:navigation:1:pageLink::IBehaviorListener:0:-1',function() { }.bind(this),function() { }.bind(this), function() {return Wicket.$('id162') != null;}.bind(this));return !wcall;
-// https://torgi.gov.ru/lotSearch1.html?wicket:interface=:11:search_panel:resultTable:list:bottomToolbars:2:toolbar:span:navigator:navigation:6:pageLink::IBehaviorListener:0:-1&random=0.5868151978315934
-//https://torgi.gov.ru/lotSearch1.html?wicket:interface=:12:search_panel:resultTable:list:bottomToolbars:2:toolbar:span:navigator:navigation:4:pageLink::IBehaviorListener:0:-1&random=0.6980142527742021
 
 func collyParse(url string, userAgent string) ([]byte, error) {
 	collector := colly.NewCollector()
@@ -75,8 +73,8 @@ func collyParse(url string, userAgent string) ([]byte, error) {
 	return nil, nil
 }
 
-func httpParse(url string, userAgent string) ([]byte, error) {
-	req, err := http.NewRequest("GET", url, nil)
+func httpParse(baseUrl string, searchType string, userAgent string) ([]byte, error) {
+	req, err := http.NewRequest("GET", baseUrl + searchType, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -93,5 +91,30 @@ func httpParse(url string, userAgent string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return content, nil
+	index := bytes.Index(content, []byte("title=\"Перейти на одну страницу вперед\""))
+	reg := regexp.MustCompile("href=\".*\"\\s")
+	link := reg.Find(content[index:])
+	if link == nil {
+		return nil, fmt.Errorf("Can't find link!")
+	}
+
+	fmt.Println(string(link))
+	fmt.Println(string(link[len("href=\""): len(link) - 2]))
+	link = link[len("href=\""): len(link) - 2]
+	req, err = http.NewRequest("GET", baseUrl + string(link), nil)
+	cookies := resp.Cookies()
+	fmt.Println(cookies)
+	for _, cookie := range cookies {
+		if cookie.Name == "JSESSIONID" {
+			req.AddCookie(cookie)
+			break
+		}
+	}
+	resp, err = client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
+
+	return nil, nil
 }
