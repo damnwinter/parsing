@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"github.com/gocolly/colly"
 	"io/ioutil"
 	"math/rand"
 	"net/http"
@@ -25,9 +24,33 @@ func GetRandom(data []string) (string, error) {
 	return data[rand.Intn(len(data))], nil
 }
 
+type LotContent struct {
+
+}
+
+type Lot struct {
+	mainLink 	[]byte
+	printLink 	[]byte
+	content 	LotContent
+}
+
+type Page struct {
+	url		string
+	content []byte
+}
+
+func (p Page) GetLots() []Lot {
+	getLotLinks(p.content, p.url)
+
+
+	return nil
+}
+
 
 func main() {
-	baseUrl := "https://torgi.gov.ru/lotSearch1.html"
+
+	baseUrl := "https://torgi.gov.ru/"
+	searchLink :="lotSearch1.html"
 	searchType := "?bidKindId=8"
 
 	userAgent, err := GetRandom(UserAgents)
@@ -41,45 +64,23 @@ func main() {
 
 
 
-	_, err = httpParse(baseUrl, searchType, userAgent)
+	_, err = httpParse(baseUrl, searchLink, searchType, userAgent)
 	if err != nil {
 		fmt.Println(err)
 	}
 
 	return
 }
-// id11_hf_0=&common%3AbidOrganizationName=&common%3AbidNumber=&common%3ApropertyTypes%3AmultiSelectText=&common%3AbidFormId=&common%3Acountry=185&common%3AlocationKladrCommon=&common%3AkladrIdStr=&search_panel%3AbuttonsPanel%3Asearch=1
-// id11_hf_0:
-// common:bidOrganizationName:
-// common:bidNumber:
-// common:propertyTypes:multiSelectText:
-// common:bidFormId:
-// common:country: 185
-// common:locationKladrCommon:
-// common:kladrIdStr:
-// search_panel:buttonsPanel:search: 1
 
-func collyParse(url string, userAgent string) ([]byte, error) {
-	collector := colly.NewCollector()
-	collector.UserAgent = userAgent
-	collector.Async = true
-
-	err := collector.Visit(url)
-	if err != nil {
-		return nil, err
-	}
-	//collector.OnHTML()
-	fmt.Println(collector.String())
-	return nil, nil
-}
-
-func httpParse(baseUrl string, searchType string, userAgent string) ([]byte, error) {
-	req, err := http.NewRequest("GET", baseUrl + searchType, nil)
+func httpParse(baseUrl string, searchLink string, searchType string, userAgent string) ([]byte, error) {
+	req, err := http.NewRequest("GET", baseUrl + searchLink + searchType, nil)
 	if err != nil {
 		return nil, err
 	}
 	req.Header.Set("user-agent", userAgent)
 
+
+	_ = make([][]byte, 1000)
 
 	client := http.DefaultClient
 	resp, err := client.Do(req)
@@ -91,6 +92,14 @@ func httpParse(baseUrl string, searchType string, userAgent string) ([]byte, err
 	if err != nil {
 		return nil, err
 	}
+
+	currentPageLinks := getLotLinks(content, baseUrl)
+	for _, link := range currentPageLinks {
+		fmt.Println(string(link))
+	}
+
+
+	return nil, nil
 	index := bytes.Index(content, []byte("title=\"Перейти на одну страницу вперед\""))
 	reg := regexp.MustCompile("href=\".*\"\\s")
 	link := reg.Find(content[index:])
@@ -110,6 +119,7 @@ func httpParse(baseUrl string, searchType string, userAgent string) ([]byte, err
 			break
 		}
 	}
+
 	resp, err = client.Do(req)
 	if err != nil {
 		return nil, err
@@ -117,4 +127,19 @@ func httpParse(baseUrl string, searchType string, userAgent string) ([]byte, err
 
 
 	return nil, nil
+}
+
+
+func getLotLinks(page []byte, baseUrl string) [][]byte {
+	reg := regexp.MustCompile("<a href=.*title=\"Просмотр\">")
+	tempLinks := reg.FindAll(page, -1)
+	if tempLinks == nil {
+		return nil
+	}
+	startPos := len("<a href=\"")
+	endPos := len("\" title=\"Просмотр\">")
+	for ind, tempLink := range tempLinks {
+		tempLinks[ind] = append([]byte(baseUrl), tempLink[startPos : len(tempLink) - endPos]...)
+	}
+	return tempLinks
 }
