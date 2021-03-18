@@ -58,7 +58,7 @@ func main() {
 		fmt.Println(err)
 		return
 	}
-	fmt.Println(userAgent)
+	//fmt.Println(userAgent)
 
 	//collyParse(url, userAgent)
 
@@ -93,37 +93,46 @@ func httpParse(baseUrl string, searchLink string, searchType string, userAgent s
 		return nil, err
 	}
 
-	currentPageLinks := getLotLinks(content, baseUrl)
-	for _, link := range currentPageLinks {
-		fmt.Println(string(link))
-	}
+	allLinks := make([][]byte, 1000)
+	for page_num := 0;; page_num += 1 {
+		currentPageLinks := getLotLinks(content, baseUrl)
+		allLinks = append(allLinks, currentPageLinks...)
+		fmt.Println(page_num, len(allLinks))
+		//for _, link := range currentPageLinks {
+		//	fmt.Println(string(link))
+		//}
 
-
-	return nil, nil
-	index := bytes.Index(content, []byte("title=\"Перейти на одну страницу вперед\""))
-	reg := regexp.MustCompile("href=\".*\"\\s")
-	link := reg.Find(content[index:])
-	if link == nil {
-		return nil, fmt.Errorf("Can't find link!")
-	}
-
-	fmt.Println(string(link))
-	fmt.Println(string(link[len("href=\""): len(link) - 2]))
-	link = link[len("href=\""): len(link) - 2]
-	req, err = http.NewRequest("GET", baseUrl + string(link), nil)
-	cookies := resp.Cookies()
-	fmt.Println(cookies)
-	for _, cookie := range cookies {
-		if cookie.Name == "JSESSIONID" {
-			req.AddCookie(cookie)
+		index := bytes.Index(content, []byte("title=\"Перейти на одну страницу вперед\""))
+		if index == -1 {
 			break
+		}
+		reg := regexp.MustCompile("\\?wicket.*\"\\s")
+		link := reg.Find(content[index:])
+		if link == nil {
+			return nil, fmt.Errorf("Can't find link!")
+		}
+
+		link = link[: len(link) - 2]
+		fmt.Println(string(link))
+		newLink := baseUrl + searchLink + string(link)
+		//req, err = http.NewRequest("GET", newLink, nil)
+		//cookies := resp.Cookies()
+		//for _, cookie := range cookies {
+		//	if cookie.Name == "JSESSIONID" {
+		//		req.AddCookie(cookie)
+		//		break
+		//	}
+		//}
+		resp, err = client.Get(newLink)
+		if err != nil {
+			return nil, err
+		}
+		content, err = ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return nil, err
 		}
 	}
 
-	resp, err = client.Do(req)
-	if err != nil {
-		return nil, err
-	}
 
 
 	return nil, nil
