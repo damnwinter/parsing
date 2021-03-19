@@ -60,9 +60,6 @@ func main() {
 	}
 	//fmt.Println(userAgent)
 
-	//collyParse(url, userAgent)
-
-
 
 	_, err = httpParse(baseUrl, searchLink, searchType, userAgent)
 	if err != nil {
@@ -115,15 +112,16 @@ func httpParse(baseUrl string, searchLink string, searchType string, userAgent s
 		link = link[: len(link) - 2]
 		fmt.Println(string(link))
 		newLink := baseUrl + searchLink + string(link)
-		//req, err = http.NewRequest("GET", newLink, nil)
-		//cookies := resp.Cookies()
-		//for _, cookie := range cookies {
-		//	if cookie.Name == "JSESSIONID" {
-		//		req.AddCookie(cookie)
-		//		break
-		//	}
-		//}
-		resp, err = client.Get(newLink)
+		fmt.Println(string(newLink))
+		req, err = http.NewRequest("GET", newLink, nil)
+		if err != nil {
+			return nil, err
+		}
+		for _, cookie := range resp.Cookies() {
+			req.AddCookie(cookie)
+		}
+
+		resp, err = client.Do(req)
 		if err != nil {
 			return nil, err
 		}
